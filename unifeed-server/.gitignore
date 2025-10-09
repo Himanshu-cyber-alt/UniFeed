@@ -60,3 +60,4 @@ temp/
 # Optional: Next.js, React, or Vite build stuff (if any)
 .next/
 .cache/
+.env
