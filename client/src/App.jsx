@@ -19,7 +19,7 @@
 import { Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
-import PostPage from "./pages/PostPage";
+import PostComment from "./pages/PostComment";
 
 
 function App() {
@@ -28,7 +28,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/home" element={<Home />} />
-        <Route path="/post/:postId" element={<PostPage />} />
+        <Route path="/post/:postId" element={<PostComment />} />
 
       </Routes>
     </div>

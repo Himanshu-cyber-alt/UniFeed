@@ -7,7 +7,6 @@ import { MessageCircle, Repeat2, Heart, Share2, Trash2 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { socket } from "../socket";
-import Comments from "./Comments";
 
 export default function Post({ post }) {
   const { user } = useSelector((state) => state.auth);
