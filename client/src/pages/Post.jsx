@@ -1,7 +1,8 @@
 
 
+
 import React, { useEffect, useState } from "react";
-import { MessageCircle, Repeat2, Heart, Share2, Trash2 } from "lucide-react";
+import { MessageCircle, Repeat2, Heart, Share2, Trash2, Link, X } from "lucide-react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { socket } from "../socket";
@@ -13,12 +14,17 @@ export default function Post({ post }) {
   const [likedByUser, setLikedByUser] = useState(false);
   const [reposts, setReposts] = useState(0);
   const [repostedByUser, setRepostedByUser] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
 
   const name = post?.name || "User";
   const username = name.toLowerCase().replace(/\s+/g, "");
   const avatarUrl = post?.avatar;
   const imageUrl = post?.image_url || post?.image || null;
+
+  // Generate the post URL
+  const postUrl = `${window.location.origin}/post/${post?.post_id}`;
 
   // 🔹 Fetch comments
   useEffect(() => {
@@ -105,132 +111,216 @@ export default function Post({ post }) {
     }
   };
 
+  // 🔹 Copy URL to clipboard
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(postUrl);
+      setCopied(true);
+      setTimeout(() => {
+        setCopied(false);
+        setShowShareModal(false);
+      }, 1500);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  // 🔹 Share button handler
+  const handleShare = (e) => {
+    e.stopPropagation();
+    setShowShareModal(true);
+  };
+
   return (
-    <div
-      className="p-4 hover:bg-gray-950 transition cursor-pointer border-b border-gray-800"
-      onClick={() => navigate(`/post/${post.post_id}`, { state: { post } })}
-    >
-      {/* Repost Indicator */}
-      {post?.post_type === 'repost' && post?.reposted_by_name && (
-        <div className="flex items-center space-x-2 text-gray-500 text-sm mb-2 ml-12">
-          <Repeat2 className="w-4 h-4" />
-          <span>{post.reposted_by_name} reposted</span>
+    <>
+      <div
+        className="p-4 hover:bg-gray-950 transition cursor-pointer border-b border-gray-800"
+        onClick={() => navigate(`/post/${post.post_id}`, { state: { post } })}
+      >
+        {/* Repost Indicator */}
+        {post?.post_type === 'repost' && post?.reposted_by_name && (
+          <div className="flex items-center space-x-2 text-gray-500 text-sm mb-2 ml-12">
+            <Repeat2 className="w-4 h-4" />
+            <span>{post.reposted_by_name} reposted</span>
+          </div>
+        )}
+        
+        <div className="flex items-start space-x-3 relative">
+          <img
+            src={avatarUrl}
+            alt="Profile"
+            className="w-12 h-12 rounded-full object-cover border border-gray-800 cursor-pointer hover:opacity-80 transition"
+            onClick={handleProfileClick}
+          />
+
+          <div className="flex-1">
+            <div className="flex items-center space-x-2">
+              <span 
+                className="font-semibold text-white hover:underline cursor-pointer"
+                onClick={handleProfileClick}
+              >
+                {name}
+              </span>
+              <span 
+                className="text-gray-500 text-sm hover:underline cursor-pointer"
+                onClick={handleProfileClick}
+              >
+                @{username}
+              </span>
+              <span className="text-gray-500 text-sm">
+                ·{" "}
+                {post?.created_at
+                  ? new Date(post.created_at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : ""}
+              </span>
+            </div>
+
+            {post?.content && (
+              <p className="text-gray-100 mt-1 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+                {post.content}
+              </p>
+            )}
+
+            {imageUrl && (
+              <div className="mt-3">
+                <img
+                  src={imageUrl}
+                  alt="Post"
+                  className="rounded-2xl border border-gray-800 w-full object-cover max-h-96"
+                />
+              </div>
+            )}
+
+            {/* 🔹 Action buttons */}
+            <div className="flex justify-between text-gray-500 mt-3 text-sm max-w-md">
+              {/* Comments */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/post/${post.post_id}`, { state: { post } });
+                }}
+                className="flex items-center space-x-2 hover:text-sky-500 transition"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>{comments.length}</span>
+              </button>
+
+              {/* Repost */}
+              <button
+                onClick={toggleRepost}
+                className={`flex items-center space-x-2 transition ${
+                  repostedByUser ? "text-green-500" : "hover:text-green-500"
+                }`}
+              >
+                <Repeat2
+                  className={`w-4 h-4 ${
+                    repostedByUser ? "text-green-500" : ""
+                  }`}
+                />
+                <span>{reposts}</span>
+              </button>
+
+              {/* Likes */}
+              <button
+                onClick={updateLikes}
+                className={`flex items-center space-x-2 transition ${
+                  likedByUser ? "text-pink-500" : "hover:text-pink-500"
+                }`}
+              >
+                <Heart
+                  className={`w-4 h-4 ${
+                    likedByUser ? "fill-pink-500 text-pink-500" : ""
+                  }`}
+                />
+                <span>{likes}</span>
+              </button>
+
+              {/* Share */}
+              <button
+                onClick={handleShare}
+                className="hover:text-sky-500 transition"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {user?.id === post?.user_id && (
+            <button
+              onClick={handleDelete}
+              className="absolute top-2 right-2 text-gray-500 hover:text-red-500 transition"
+              title="Delete Post"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowShareModal(false);
+          }}
+        >
+          <div 
+            className="bg-gray-900 rounded-2xl border border-gray-800 w-full max-w-md mx-4 overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-800">
+              <h3 className="text-lg font-semibold text-white">Share Post</h3>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowShareModal(false);
+                }}
+                className="text-gray-400 hover:text-white transition p-1 rounded-full hover:bg-gray-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Copy Link Option */}
+            <div className="p-2">
+              <button
+                onClick={handleCopyLink}
+                className="w-full flex items-center space-x-3 p-4 hover:bg-gray-800 rounded-xl transition text-left"
+              >
+                <div className="bg-sky-500 bg-opacity-20 p-3 rounded-full">
+                  <Link className="w-5 h-5 text-sky-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-medium">
+                    {copied ? "Link copied!" : "Copy link"}
+                  </p>
+                  <p className="text-gray-400 text-sm">
+                    {copied ? "You can now share it anywhere" : "Copy link to post"}
+                  </p>
+                </div>
+                {copied && (
+                  <div className="text-green-500 text-sm font-semibold">
+                    ✓
+                  </div>
+                )}
+              </button>
+            </div>
+
+            {/* URL Preview */}
+            <div className="p-4 border-t border-gray-800">
+              <div className="bg-gray-800 rounded-lg p-3 text-xs text-gray-400 break-all">
+                {postUrl}
+              </div>
+            </div>
+          </div>
         </div>
       )}
-      
-      <div className="flex items-start space-x-3 relative">
-        <img
-          src={avatarUrl}
-          alt="Profile"
-          className="w-12 h-12 rounded-full object-cover border border-gray-800 cursor-pointer hover:opacity-80 transition"
-          onClick={handleProfileClick}
-        />
-
-        <div className="flex-1">
-          <div className="flex items-center space-x-2">
-            <span 
-              className="font-semibold text-white hover:underline cursor-pointer"
-              onClick={handleProfileClick}
-            >
-              {name}
-            </span>
-            <span 
-              className="text-gray-500 text-sm hover:underline cursor-pointer"
-              onClick={handleProfileClick}
-            >
-              @{username}
-            </span>
-            <span className="text-gray-500 text-sm">
-              ·{" "}
-              {post?.created_at
-                ? new Date(post.created_at).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : ""}
-            </span>
-          </div>
-
-          {post?.content && (
-            <p className="text-gray-100 mt-1 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
-              {post.content}
-            </p>
-          )}
-
-          {imageUrl && (
-            <div className="mt-3">
-              <img
-                src={imageUrl}
-                alt="Post"
-                className="rounded-2xl border border-gray-800 w-full object-cover max-h-96"
-              />
-            </div>
-          )}
-
-          {/* 🔹 Action buttons */}
-          <div className="flex justify-between text-gray-500 mt-3 text-sm max-w-md">
-            {/* Comments */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/post/${post.post_id}`, { state: { post } });
-              }}
-              className="flex items-center space-x-2 hover:text-sky-500 transition"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>{comments.length}</span>
-            </button>
-
-            {/* Repost */}
-            <button
-              onClick={toggleRepost}
-              className={`flex items-center space-x-2 transition ${
-                repostedByUser ? "text-green-500" : "hover:text-green-500"
-              }`}
-            >
-              <Repeat2
-                className={`w-4 h-4 ${
-                  repostedByUser ? "text-green-500" : ""
-                }`}
-              />
-              <span>{reposts}</span>
-            </button>
-
-            {/* Likes */}
-            <button
-              onClick={updateLikes}
-              className={`flex items-center space-x-2 transition ${
-                likedByUser ? "text-pink-500" : "hover:text-pink-500"
-              }`}
-            >
-              <Heart
-                className={`w-4 h-4 ${
-                  likedByUser ? "fill-pink-500 text-pink-500" : ""
-                }`}
-              />
-              <span>{likes}</span>
-            </button>
-
-            {/* Share */}
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="hover:text-sky-500 transition"
-            >
-              <Share2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {user?.id === post?.user_id && (
-          <button
-            onClick={handleDelete}
-            className="absolute top-2 right-2 text-gray-500 hover:text-red-500 transition"
-            title="Delete Post"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-    </div>
+    </>
   );
 }
