@@ -11,6 +11,8 @@ export default function Post({ post }) {
   const [comments, setComments] = useState([]);
   const [likes, setLikes] = useState(0);
   const [likedByUser, setLikedByUser] = useState(false);
+  const [reposts, setReposts] = useState(0);
+  const [repostedByUser, setRepostedByUser] = useState(false);
   const navigate = useNavigate();
 
   const name = post?.name || "User";
@@ -49,11 +51,38 @@ export default function Post({ post }) {
     return () => socket.off("load_likes", handleLikes);
   }, [post?.post_id, user?.id]);
 
+  // 🔹 Fetch reposts for this post
+  useEffect(() => {
+    if (!post?.post_id) return;
+
+    socket.emit("fetch_reposts", post.post_id);
+
+    const handleReposts = ({ postId, reposts, repostedBy }) => {
+      if (postId === post.post_id) {
+        setReposts(reposts);
+        setRepostedByUser(repostedBy?.includes(user?.id));
+      }
+    };
+
+    socket.on("load_reposts", handleReposts);
+    return () => socket.off("load_reposts", handleReposts);
+  }, [post?.post_id, user?.id]);
+
   // 🔹 Like/unlike handler
   const updateLikes = (e) => {
     e.stopPropagation();
     if (!user || !post?.post_id) return;
     socket.emit("update_like", {
+      post_id: post.post_id,
+      user_id: user.id,
+    });
+  };
+
+  // 🔹 Repost handler
+  const toggleRepost = (e) => {
+    e.stopPropagation();
+    if (!user || !post?.post_id) return;
+    socket.emit("toggle_repost", {
       post_id: post.post_id,
       user_id: user.id,
     });
@@ -81,6 +110,14 @@ export default function Post({ post }) {
       className="p-4 hover:bg-gray-950 transition cursor-pointer border-b border-gray-800"
       onClick={() => navigate(`/post/${post.post_id}`, { state: { post } })}
     >
+      {/* Repost Indicator */}
+      {post?.post_type === 'repost' && post?.reposted_by_name && (
+        <div className="flex items-center space-x-2 text-gray-500 text-sm mb-2 ml-12">
+          <Repeat2 className="w-4 h-4" />
+          <span>{post.reposted_by_name} reposted</span>
+        </div>
+      )}
+      
       <div className="flex items-start space-x-3 relative">
         <img
           src={avatarUrl}
@@ -146,11 +183,17 @@ export default function Post({ post }) {
 
             {/* Repost */}
             <button
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center space-x-2 hover:text-green-500 transition"
+              onClick={toggleRepost}
+              className={`flex items-center space-x-2 transition ${
+                repostedByUser ? "text-green-500" : "hover:text-green-500"
+              }`}
             >
-              <Repeat2 className="w-4 h-4" />
-              <span>5</span>
+              <Repeat2
+                className={`w-4 h-4 ${
+                  repostedByUser ? "text-green-500" : ""
+                }`}
+              />
+              <span>{reposts}</span>
             </button>
 
             {/* Likes */}

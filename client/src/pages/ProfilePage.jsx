@@ -1,10 +1,9 @@
 
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { socket } from "../socket";
-import { ArrowLeft, Calendar, Users, Heart, MessageCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Users, Heart, MessageCircle, Repeat2 } from "lucide-react";
 import Post from "./Post";
 
 export default function ProfilePage() {
@@ -16,6 +15,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState("posts");
   const [posts, setPosts] = useState([]);
   const [likedPosts, setLikedPosts] = useState([]);
+  const [repostedPosts, setRepostedPosts] = useState([]);
   const [comments, setComments] = useState([]);
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
@@ -40,11 +40,14 @@ export default function ProfilePage() {
     // Fetch user profile
     socket.emit("fetch_profile", { userId, currentUserId: currentUser.id });
     
-    // Fetch user posts
+    // Fetch user posts (includes reposts now)
     socket.emit("fetch_user_posts", userId);
     
     // Fetch liked posts
     socket.emit("fetch_user_likes", userId);
+    
+    // Fetch user reposts
+    socket.emit("fetch_user_reposts", userId);
     
     // Fetch user comments
     socket.emit("fetch_user_comments", userId);
@@ -75,6 +78,10 @@ export default function ProfilePage() {
       console.log("📥 Received likes:", data.length);
       setLikedPosts(data);
     };
+    const handleLoadReposts = (data) => {
+      console.log("📥 Received reposts:", data.length);
+      setRepostedPosts(data);
+    };
     const handleLoadComments = (data) => {
       console.log("📥 Received comments:", data.length);
       setComments(data);
@@ -91,6 +98,7 @@ export default function ProfilePage() {
     socket.on("load_profile", handleLoadProfile);
     socket.on("load_user_posts", handleLoadPosts);
     socket.on("load_user_likes", handleLoadLikes);
+    socket.on("load_user_reposts", handleLoadReposts);
     socket.on("load_user_comments", handleLoadComments);
     socket.on("load_followers", handleLoadFollowers);
     socket.on("load_following", handleLoadFollowing);
@@ -99,6 +107,7 @@ export default function ProfilePage() {
       socket.off("load_profile", handleLoadProfile);
       socket.off("load_user_posts", handleLoadPosts);
       socket.off("load_user_likes", handleLoadLikes);
+      socket.off("load_user_reposts", handleLoadReposts);
       socket.off("load_user_comments", handleLoadComments);
       socket.off("load_followers", handleLoadFollowers);
       socket.off("load_following", handleLoadFollowing);
@@ -227,12 +236,12 @@ export default function ProfilePage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-800 flex">
-          {["posts", "likes", "comments", "followers", "following"].map((tab) => (
+        <div className="border-b border-gray-800 flex overflow-x-auto">
+          {["posts", "reposts", "likes", "comments", "followers", "following"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-4 text-center font-semibold transition relative ${
+              className={`flex-1 py-4 text-center font-semibold transition relative whitespace-nowrap px-4 ${
                 activeTab === tab
                   ? "text-white"
                   : "text-gray-500 hover:bg-gray-900"
@@ -240,7 +249,7 @@ export default function ProfilePage() {
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
               {activeTab === tab && (
-                <div key={`indicator-${tab}`} className="absolute bottom-0 left-0 right-0 h-1 bg-sky-500 rounded-full"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-sky-500 rounded-full"></div>
               )}
             </button>
           ))}
@@ -251,10 +260,23 @@ export default function ProfilePage() {
           {activeTab === "posts" && (
             <div className="divide-y divide-gray-800">
               {posts.length > 0 ? (
-                posts.map((post) => <Post key={post.post_id} post={post} />)
+                posts.map((post, index) => <Post key={`${post.post_id}-${index}`} post={post} />)
               ) : (
                 <div className="p-8 text-center text-gray-500">
                   No posts yet
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "reposts" && (
+            <div className="divide-y divide-gray-800">
+              {repostedPosts.length > 0 ? (
+                repostedPosts.map((post) => <Post key={post.post_id} post={post} />)
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  <Repeat2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  No reposts yet
                 </div>
               )}
             </div>
