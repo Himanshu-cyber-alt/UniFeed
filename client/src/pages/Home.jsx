@@ -1,8 +1,15 @@
 
+
+
+
+
+
+
+
 import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { socket } from "../socket";
-import Post from "./Post";
+import Post from "../pages/Post";
 import { logout } from "../features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -19,20 +26,40 @@ export default function Home() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  console.log(user.avatar)
-  // Socket fetch
+  console.log(user.avatar);
+
+  // Socket connection and posts fetching
   useEffect(() => {
-    socket.connect();
-    socket.on("load_posts", (data) => setPosts(data));
+    console.log("🚀 Home component mounted");
+
+    // Listen for posts FIRST before doing anything
+    const handleLoadPosts = (data) => {
+      console.log("📥 Received posts:", data.length);
+      setPosts(data);
+    };
+
+    socket.on("load_posts", handleLoadPosts);
+
+    // Connect socket (server will auto-send posts on connection)
+    if (!socket.connected) {
+      console.log("🔌 Connecting socket...");
+      socket.connect();
+    } else {
+      // Already connected, manually fetch
+      console.log("✅ Socket already connected, fetching posts...");
+      socket.emit("fetch_posts");
+    }
+
     return () => {
-      socket.off("load_posts");
-      socket.disconnect();
+      socket.off("load_posts", handleLoadPosts);
+      // DON'T disconnect - keep socket alive for navigation
     };
   }, [user]);
 
   // Logout
   const handleLogout = () => {
     dispatch(logout());
+    socket.disconnect(); // Only disconnect on logout
     navigate("/");
   };
 
@@ -47,7 +74,7 @@ export default function Home() {
 
   // Upload image
   const uploadImage = async () => {
-    console.log("step 1 ",image)
+    console.log("step 1 ", image);
     if (!image) return null;
     try {
       setUploading(true);
@@ -58,11 +85,7 @@ export default function Home() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-          
       return res.data.imageUrl;
-      
- 
-      // Ensure this is a valid URL
     } catch (error) {
       console.error("Upload failed", error);
       return null;
@@ -82,21 +105,26 @@ export default function Home() {
     setIsModalOpen(false);
   };
 
-
-
-
   return (
     <div className="min-h-screen bg-black text-white flex justify-center relative">
       <div className="w-full max-w-2xl border-x border-gray-800">
         {/* Header */}
         <div className="sticky top-0 bg-black bg-opacity-90 backdrop-blur p-4 border-b border-gray-800 flex justify-between items-center">
           <h1 className="text-xl font-bold">Home</h1>
-          <button
-            onClick={handleLogout}
-            className="bg-sky-500 hover:bg-sky-600 transition font-semibold px-5 py-1.5 rounded-full"
-          >
-            Logout
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => navigate(`/profile/${user.id}`)}
+              className="text-sky-500 hover:underline font-medium"
+            >
+              My Profile
+            </button>
+            <button
+              onClick={handleLogout}
+              className="bg-sky-500 hover:bg-sky-600 transition font-semibold px-5 py-1.5 rounded-full"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Posts */}
@@ -123,18 +151,17 @@ export default function Home() {
           <div className="bg-black border border-gray-800 rounded-2xl w-full max-w-md p-4">
             <div className="flex items-start space-x-3">
               <img
-                src={user.avatar }
+                src={user.avatar}
                 alt="Profile"
                 className="w-12 h-12 rounded-full"
               />
-             
 
               <div className="flex-1">
                 <textarea
                   rows="3"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="What’s happening?!"
+                  placeholder="What's happening?!"
                   className="w-full bg-black text-white placeholder-gray-500 resize-none border-none outline-none text-lg"
                 />
 
@@ -170,7 +197,6 @@ export default function Home() {
                     </button>
                   </div>
                 </div>
-
               </div>
             </div>
           </div>
@@ -179,4 +205,3 @@ export default function Home() {
     </div>
   );
 }
-

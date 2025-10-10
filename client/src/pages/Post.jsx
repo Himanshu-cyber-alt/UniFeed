@@ -1,7 +1,5 @@
 
 
-
-
 import React, { useEffect, useState } from "react";
 import { MessageCircle, Repeat2, Heart, Share2, Trash2 } from "lucide-react";
 import { useSelector } from "react-redux";
@@ -11,21 +9,17 @@ import { socket } from "../socket";
 export default function Post({ post }) {
   const { user } = useSelector((state) => state.auth);
   const [comments, setComments] = useState([]);
+  const [likes, setLikes] = useState(0);
+  const [likedByUser, setLikedByUser] = useState(false);
   const navigate = useNavigate();
 
   const name = post?.name || "User";
   const username = name.toLowerCase().replace(/\s+/g, "");
-  const avatarUrl = post?.avatar ;
+  const avatarUrl = post?.avatar;
   const imageUrl = post?.image_url || post?.image || null;
 
-  
-
-
-
-
-  // Fetch comments for this post
-
- useEffect(() => {
+  // 🔹 Fetch comments
+  useEffect(() => {
     if (!post?.post_id) return;
 
     socket.emit("fetch_comments", post.post_id);
@@ -35,47 +29,80 @@ export default function Post({ post }) {
     };
 
     socket.on("load_comments", handleLoadComments);
-
-    return () => {
-      socket.off("load_comments", handleLoadComments);
-    };
+    return () => socket.off("load_comments", handleLoadComments);
   }, [post?.post_id]);
 
-  const handleDelete = (e) => {
-    e.stopPropagation(); // Prevent navigating to post page
-    if (!user || !post?.post_id) return;
+  // 🔹 Fetch likes for this post
+  useEffect(() => {
+    if (!post?.post_id) return;
 
+    socket.emit("fetch_likes", post.post_id);
+
+    const handleLikes = ({ postId, likes, likedBy }) => {
+      if (postId === post.post_id) {
+        setLikes(likes);
+        setLikedByUser(likedBy?.includes(user?.id));
+      }
+    };
+
+    socket.on("load_likes", handleLikes);
+    return () => socket.off("load_likes", handleLikes);
+  }, [post?.post_id, user?.id]);
+
+  // 🔹 Like/unlike handler
+  const updateLikes = (e) => {
+    e.stopPropagation();
+    if (!user || !post?.post_id) return;
+    socket.emit("update_like", {
+      post_id: post.post_id,
+      user_id: user.id,
+    });
+  };
+
+  // 🔹 Delete post handler
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    if (!user || !post?.post_id) return;
     if (window.confirm("Are you sure you want to delete this post?")) {
       socket.emit("delete_post", { post_id: post.post_id, user_id: user.id });
+    }
+  };
+
+  // 🔹 Navigate to profile
+  const handleProfileClick = (e) => {
+    e.stopPropagation();
+    if (post?.user_id) {
+      navigate(`/profile/${post.user_id}`);
     }
   };
 
   return (
     <div
       className="p-4 hover:bg-gray-950 transition cursor-pointer border-b border-gray-800"
-     onClick={() =>
-    navigate(`/post/${post.post_id}`, { state: { post } })
-  }
+      onClick={() => navigate(`/post/${post.post_id}`, { state: { post } })}
     >
       <div className="flex items-start space-x-3 relative">
-        {/* Avatar */}
         <img
           src={avatarUrl}
           alt="Profile"
-          className="w-12 h-12 rounded-full object-cover border border-gray-800"
-
- onClick={(e) => {
-    e.stopPropagation(); // prevent navigating to post page
-
-  }}
-
+          className="w-12 h-12 rounded-full object-cover border border-gray-800 cursor-pointer hover:opacity-80 transition"
+          onClick={handleProfileClick}
         />
 
         <div className="flex-1">
-          {/* User info */}
           <div className="flex items-center space-x-2">
-            <span className="font-semibold text-white">{name}</span>
-            <span className="text-gray-500 text-sm">@{username}</span>
+            <span 
+              className="font-semibold text-white hover:underline cursor-pointer"
+              onClick={handleProfileClick}
+            >
+              {name}
+            </span>
+            <span 
+              className="text-gray-500 text-sm hover:underline cursor-pointer"
+              onClick={handleProfileClick}
+            >
+              @{username}
+            </span>
             <span className="text-gray-500 text-sm">
               ·{" "}
               {post?.created_at
@@ -87,14 +114,12 @@ export default function Post({ post }) {
             </span>
           </div>
 
-          {/* Post content */}
           {post?.content && (
             <p className="text-gray-100 mt-1 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
               {post.content}
             </p>
           )}
 
-          {/* Post image */}
           {imageUrl && (
             <div className="mt-3">
               <img
@@ -105,16 +130,21 @@ export default function Post({ post }) {
             </div>
           )}
 
-          {/* Action buttons */}
+          {/* 🔹 Action buttons */}
           <div className="flex justify-between text-gray-500 mt-3 text-sm max-w-md">
+            {/* Comments */}
             <button
-              onClick={(e) =>  navigate(`/post/${post.post_id}`, { state: { post } })}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/post/${post.post_id}`, { state: { post } });
+              }}
               className="flex items-center space-x-2 hover:text-sky-500 transition"
             >
               <MessageCircle className="w-4 h-4" />
               <span>{comments.length}</span>
             </button>
 
+            {/* Repost */}
             <button
               onClick={(e) => e.stopPropagation()}
               className="flex items-center space-x-2 hover:text-green-500 transition"
@@ -123,14 +153,22 @@ export default function Post({ post }) {
               <span>5</span>
             </button>
 
+            {/* Likes */}
             <button
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center space-x-2 hover:text-pink-500 transition"
+              onClick={updateLikes}
+              className={`flex items-center space-x-2 transition ${
+                likedByUser ? "text-pink-500" : "hover:text-pink-500"
+              }`}
             >
-              <Heart className="w-4 h-4" />
-              <span>23</span>
+              <Heart
+                className={`w-4 h-4 ${
+                  likedByUser ? "fill-pink-500 text-pink-500" : ""
+                }`}
+              />
+              <span>{likes}</span>
             </button>
 
+            {/* Share */}
             <button
               onClick={(e) => e.stopPropagation()}
               className="hover:text-sky-500 transition"
@@ -138,12 +176,8 @@ export default function Post({ post }) {
               <Share2 className="w-4 h-4" />
             </button>
           </div>
-
-          {/* Comments preview */}
-  
         </div>
 
-        {/* Delete button */}
         {user?.id === post?.user_id && (
           <button
             onClick={handleDelete}
@@ -157,5 +191,3 @@ export default function Post({ post }) {
     </div>
   );
 }
-
-

@@ -1,26 +1,10 @@
 
-// import { Routes, Route } from "react-router-dom";
-// import Home from "./pages/Home";
-// import PostPage from "./pages/PostPage";
-// import Landing from "./pages/Landing";
-
-// export default function App() {
-//   return (
-//     <div className="bg-black min-h-screen text-white">
-//       <Routes>
-//         <Route path="/" element={<Landing />} />
-//         <Route path="/home" element={<Home />} />
-//         <Route path="/post/:postId" element={<PostPage />} />
-//       </Routes>
-//     </div>
-//   );
-// }
 
 import { Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import PostComment from "./pages/PostComment";
-
+import ProfilePage from "./pages/ProfilePage"; // Add this import
 
 function App() {
   return (
@@ -29,7 +13,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/home" element={<Home />} />
         <Route path="/post/:postId" element={<PostComment />} />
-
+        <Route path="/profile/:userId" element={<ProfilePage />} /> {/* Add this route */}
       </Routes>
     </div>
   );
