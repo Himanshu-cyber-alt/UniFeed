@@ -1,54 +1,100 @@
-// routes/profileRoutes.js
 import express from "express";
 import { pool } from "../db.js";
+
 const router = express.Router();
 
+// ---------------- GET user profile ----------------
 router.get("/:userId", async (req, res) => {
-  const { userId } = req.params;
-
   try {
-    // 1. User info
-    const userRes = await pool.query("SELECT id, name, email, avatar FROM users WHERE id = $1", [userId]);
-    if (userRes.rowCount === 0) return res.status(404).json({ error: "User not found" });
-    const user = userRes.rows[0];
-
-    // 2. Posts
-    const postsRes = await pool.query(
-      "SELECT p.id AS post_id, p.content, p.image_url, p.created_at FROM posts p WHERE p.user_id = $1 ORDER BY created_at DESC",
+    const { userId } = req.params;
+    const result = await pool.query(
+      "SELECT id, name, avatar FROM users WHERE id = $1",
       [userId]
     );
-
-    // 3. Replies (comments by user)
-    const repliesRes = await pool.query(
-      "SELECT c.id AS post_id, c.content, c.created_at, p.id AS parent_post_id FROM comments c JOIN posts p ON c.post_id = p.id WHERE c.user_id = $1 ORDER BY c.created_at DESC",
-      [userId]
-    );
-
-
-    
-    // 4. Likes (assuming you have a likes table)
-    const likesRes = await pool.query(
-      "SELECT l.post_id, p.content, p.image_url, p.created_at FROM likes l JOIN posts p ON l.post_id = p.id WHERE l.user_id = $1 ORDER BY l.created_at DESC",
-      [userId]
-    );
-
-    // 5. Media posts (posts with image)
-    const mediaRes = await pool.query(
-      "SELECT id AS post_id, content, image_url, created_at FROM posts WHERE user_id = $1 AND image_url IS NOT NULL ORDER BY created_at DESC",
-      [userId]
-    );
-
-    res.json({
-      user,
-      posts: postsRes.rows,
-      replies: repliesRes.rows,
-      likes: likesRes.rows,
-      media: mediaRes.rows,
-    });
+    if (!result.rows.length) return res.status(404).json({ error: "User not found" });
+    res.json(result.rows[0]);
   } catch (err) {
-    console.error("Profile fetch error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ---------------- GET user posts ----------------
+router.get("/:userId/posts", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `SELECT posts.id AS post_id, posts.content, posts.image_url, posts.created_at,
+              users.id AS user_id, users.name, users.avatar
+       FROM posts
+       JOIN users ON posts.user_id = users.id
+       WHERE user_id = $1
+       ORDER BY posts.created_at DESC`,
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ---------------- GET liked posts ----------------
+router.get("/:userId/likes", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `SELECT posts.id AS post_id, posts.content, posts.image_url, posts.created_at,
+              users.id AS user_id, users.name, users.avatar
+       FROM likes
+       JOIN posts ON likes.post_id = posts.id
+       JOIN users ON posts.user_id = users.id
+       WHERE likes.user_id = $1
+       ORDER BY likes.created_at DESC`,
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ---------------- GET followers ----------------
+router.get("/:userId/followers", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.avatar
+       FROM follows f
+       JOIN users u ON f.follower_id = u.id
+       WHERE f.following_id = $1`,
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ---------------- GET following ----------------
+router.get("/:userId/following", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.avatar
+       FROM follows f
+       JOIN users u ON f.following_id = u.id
+       WHERE f.follower_id = $1`,
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
 export default router;
+
