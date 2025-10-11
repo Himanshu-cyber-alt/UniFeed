@@ -26,6 +26,7 @@ export default function Post({ post }) {
   // Generate the post URL
   const postUrl = `${window.location.origin}/post/${post?.post_id}`;
 
+ 
   // 🔹 Fetch comments
   useEffect(() => {
     if (!post?.post_id) return;

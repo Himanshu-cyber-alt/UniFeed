@@ -6,6 +6,7 @@ import Post from "../pages/Post";
 import { logout } from "../features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+
 import {
   Home,
   Bell,
@@ -18,12 +19,6 @@ import {
   Users,
 } from "lucide-react";
 
-const suggestedUsers = [
-  { id: 101, name: "TechInnovator", username: "techguru", avatar: "https://i.pravatar.cc/150?u=techguru" },
-  { id: 102, name: "ArtisticFlow", username: "artflow", avatar: "https://i.pravatar.cc/150?u=artflow" },
-  { id: 103, name: "Wanderlust", username: "travelbug", avatar: "https://i.pravatar.cc/150?u=travelbug" },
-];
-
 export default function HomePage() {
   const { user } = useSelector((state) => state.auth);
   const [posts, setPosts] = useState([]);
@@ -32,6 +27,9 @@ export default function HomePage() {
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
+   const [allUsers, setAllUsers] = useState([]);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -44,8 +42,63 @@ export default function HomePage() {
     if (!socket.connected) socket.connect();
     socket.emit("fetch_posts");
 
+
+
+
+
     return () => socket.off("load_posts", handleLoadPosts);
+
   }, [user]);
+
+
+  useEffect(()=>{
+     const fetchAllUsers = async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/api/users");
+        console.log(res.data)
+        setAllUsers(res.data);
+      } catch (error) {
+        console.error("Failed to fetch users", error);
+      }
+    };
+    fetchAllUsers();
+  },[])
+
+  console.log("All users => ",allUsers)
+
+  // Get unique users for suggested accounts
+  const uniqueUsers = posts
+    .filter(
+      (p, index, self) =>
+        index === self.findIndex(u => u.user_id === p.user_id)
+    )
+    .slice(0, 3);
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // Filter users based on search query
+  const searchResults = searchQuery.trim()
+    ? allUsers
+        .filter(
+          (p, index, self) =>
+            index === self.findIndex(u => u.id === p.id)
+        )
+        .filter(
+          (user) =>
+            user.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            user.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+    : [];
 
   const handleLogout = () => {
     dispatch(logout());
@@ -95,13 +148,62 @@ export default function HomePage() {
       {/* HEADER */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-[#121212]/80 backdrop-blur-md border-b border-gray-800 z-40 flex items-center justify-center">
         <div className="w-full max-w-[1200px] px-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-wide bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
-            UniFeed
+          <h1 className="text-4xl font-bold tracking-wide bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
+            𐂂 UniFeed
           </h1>
-          <div className="hidden md:flex flex-1 max-w-sm ml-8 items-center bg-gray-800 rounded-full px-4 py-2">
-            <input type="text" placeholder="Search accounts" className="bg-transparent w-full text-white outline-none"/>
+        
+
+          
+          {/* SEARCH BAR */}
+          <div className="hidden md:flex flex-1 max-w-sm ml-8 items-center bg-gray-800 rounded-full px-4 py-2 relative">
+            <input 
+              type="text" 
+              placeholder="Search accounts" 
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSearchResults(e.target.value.trim().length > 0);
+              }}
+              onFocus={() => setShowSearchResults(searchQuery.trim().length > 0)}
+              className="bg-transparent w-full text-white outline-none"
+            />
             <Search className="text-gray-500"/>
+            
+            {/* Search Results Dropdown */}
+            {showSearchResults && searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50">
+                {searchResults.map((sUser) => (
+                  <div
+                    key={sUser.user_id}
+                    onClick={() => {
+                      navigate(`/profile/${sUser.id}`);
+                      setSearchQuery("");
+                      setShowSearchResults(false);
+                    }}
+                    className="flex items-center gap-3 p-3 hover:bg-gray-800 cursor-pointer border-b border-gray-800 last:border-b-0 transition"
+                  >
+                    <img
+                      src={sUser.avatar}
+                      alt={sUser.name}
+                      className="w-10 h-10 rounded-full"
+                    />
+                    <div>
+                      <p className="font-bold text-white">{sUser.username}</p>
+                      <p className="text-sm text-gray-400">{sUser.name}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* No results message */}
+            {showSearchResults && searchResults.length === 0 && searchQuery.trim() && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-lg p-4 text-center text-gray-400 z-50">
+                No users found
+              </div>
+            )}
           </div>
+
           <div className="flex items-center gap-4">
             <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-black font-semibold px-4 py-2 rounded-md hover:bg-gray-200 transition">
               <Plus className="w-5 h-5"/>
@@ -120,10 +222,14 @@ export default function HomePage() {
               <Home className="w-7 h-7" />
               <span>For You</span>
             </button>
-            <button className="flex items-center gap-4 text-xl font-bold px-4 py-3 hover:bg-gray-800 text-gray-300 rounded-lg transition">
+
+
+            {/* <button className="flex items-center gap-4 text-xl font-bold px-4 py-3 hover:bg-gray-800 text-gray-300 rounded-lg transition">
               <Users className="w-7 h-7" />
               <span>Following</span>
-            </button>
+            </button> */}
+
+
             <button onClick={() => navigate(`/profile/${user?.id}`)} className="flex items-center gap-4 text-xl font-bold px-4 py-3 hover:bg-gray-800 text-gray-300 rounded-lg transition">
               <User className="w-7 h-7" />
               <span>Profile</span>
@@ -132,15 +238,25 @@ export default function HomePage() {
           <hr className="border-gray-800 my-4"/>
           <div className="px-4 text-gray-500 font-semibold">Suggested accounts</div>
           <div className="flex flex-col gap-2 mt-3">
-            {suggestedUsers.map(sUser => (
-              <div key={sUser.id} className="flex items-center gap-3 p-2 hover:bg-gray-800 rounded-lg cursor-pointer">
-                <img src={sUser.avatar} alt={sUser.name} className="w-10 h-10 rounded-full"/>
-                <div>
-                  <p className="font-bold text-white">{sUser.username}</p>
-                  <p className="text-sm text-gray-400">{sUser.name}</p>
+            <div>
+              {uniqueUsers.map(sUser => (
+                <div
+                  key={sUser.user_id}
+                  className="flex items-center gap-3 p-2 hover:bg-gray-800 rounded-lg cursor-pointer"
+                >
+                  <img  
+                    src={sUser.avatar}
+                    alt={sUser.name}
+                    className="w-10 h-10 rounded-full"
+                    onClick={() => navigate(`/profile/${sUser?.user_id}`)}
+                  />
+                  <div>
+                    <p className="font-bold text-white">{sUser.username}</p>
+                    <p className="text-sm text-gray-400">{sUser.name}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
           <button
             onClick={handleLogout}
@@ -174,9 +290,80 @@ export default function HomePage() {
         <button onClick={() => navigate('/home')} className="p-2 text-white">
           <Home className="w-7 h-7" />
         </button>
-        <button className="p-2 text-gray-400">
+
+        {/* <button className="p-2 text-gray-400">
           <Users className="w-7 h-7" />
-        </button>
+        </button> */}
+
+
+
+
+
+
+
+
+
+{/* MOBILE SEARCH BUTTON */}
+<button
+  onClick={() => setShowSearchResults((prev) => !prev)}
+  className="p-2 text-gray-400 md:hidden"
+>
+  <Search className="w-7 h-7" />
+</button>
+
+{/* MOBILE SEARCH MODAL */}
+{showSearchResults && (
+  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col p-4">
+    <div className="flex items-center bg-gray-900 rounded-full px-4 py-2">
+      <input
+        type="text"
+        placeholder="Search accounts"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        autoFocus
+        className="bg-transparent w-full text-white outline-none"
+      />
+      <Search className="text-gray-500" />
+      <button
+        onClick={() => {
+          setSearchQuery("");
+          setShowSearchResults(false);
+        }}
+        className="ml-2 text-gray-400 hover:text-white"
+      >
+        <X className="w-6 h-6" />
+      </button>
+    </div>
+
+    <div className="mt-3 bg-gray-900 rounded-lg max-h-80 overflow-y-auto border border-gray-700">
+      {searchResults.length > 0 ? (
+        searchResults.map((sUser) => (
+          <div
+            key={sUser.id}
+            onClick={() => {
+              navigate(`/profile/${sUser.id}`);
+              setSearchQuery("");
+              setShowSearchResults(false);
+            }}
+            className="flex items-center gap-3 p-3 hover:bg-gray-800 cursor-pointer border-b border-gray-800 last:border-b-0"
+          >
+            <img src={sUser.avatar} alt={sUser.name} className="w-10 h-10 rounded-full" />
+            <div>
+              <p className="font-bold text-white">{sUser.username}</p>
+              <p className="text-sm text-gray-400">{sUser.name}</p>
+            </div>
+          </div>
+        ))
+      ) : (
+        <p className="p-4 text-center text-gray-400">No users found</p>
+      )}
+    </div>
+  </div>
+)}
+
+
+
+
         <button onClick={() => setIsModalOpen(true)} className="p-2">
           <div className="w-12 h-8 bg-white rounded-lg flex items-center justify-center">
             <Plus className="w-6 h-6 text-black" />
@@ -238,3 +425,4 @@ export default function HomePage() {
     </div>
   );
 }
+
